@@ -185,28 +185,4 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         risk_alert_threshold=_risk_threshold(
             alert_threshold_value
         ),
-    )def load_config(path: str | Path | None = None) -> AppConfig:
-    """Charge la configuration. Les variables UMBRALYN_* ont priorité sur YAML."""
-    config_path = Path(path or os.environ.get("UMBRALYN_CONFIG", DEFAULT_CONFIG_PATH))
-    data: dict[str, Any] = {}
-    if config_path.exists():
-        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        data = _mapping(loaded)
-
-    scan = _mapping(data.get("scan"))
-    database = _mapping(data.get("database"))
-    report = _mapping(data.get("report"))
-    risk = _mapping(data.get("risk"))
-    target = _mapping(data.get("target"))
-    return AppConfig(
-        target_network=os.environ.get("UMBRALYN_TARGET", target.get("network")),
-        scan=ScanConfig(
-            service_detection=bool(scan.get("service_detection", True)),
-            os_detection=bool(scan.get("os_detection", False)),
-            nse=bool(scan.get("nse", False)),
-            timeout_seconds=int(os.environ.get("UMBRALYN_TIMEOUT", scan.get("timeout_seconds", 600))),
-        ),
-        database_path=Path(os.environ.get("UMBRALYN_DATABASE_PATH", database.get("path", "data/umbralyn.db"))),
-        reports_dir=Path(os.environ.get("UMBRALYN_REPORTS_DIR", report.get("directory", "reports"))),
-        risk_alert_threshold=int(os.environ.get("UMBRALYN_ALERT_THRESHOLD", risk.get("alert_threshold", 70))),
     )

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Environnements, dépendances et outils de qualité
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+config.yaml
+config.local.yaml
+
+# Données générées par NetAudit
+data/
+reports/
+scans/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Système et éditeurs
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umbralyn"
+version = "0.2.0"
+description = "Defensive network auditing with history and reporting"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "jinja2>=3.1",
+  "PyYAML>=6.0",
+  "requests>=2.31",
+  "weasyprint>=61.0",
+]
+
+[project.scripts]
+umbralyn = "umbralyn.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

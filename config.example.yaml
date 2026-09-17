@@ -1,0 +1,14 @@
+# Copiez ce fichier en config.yaml et adaptez-le à votre environnement autorisé.
+target:
+  network: "192.168.1.0/24"
+scan:
+  service_detection: true
+  os_detection: false
+  nse: false
+  timeout_seconds: 600
+risk:
+  alert_threshold: 70
+database:
+  path: "./data/umbralyn.db"
+report:
+  directory: "./reports"

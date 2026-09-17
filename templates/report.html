@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Rapport d'audit réseau — {{ scan.target }}</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --border: #262b3a;
+    --text: #e4e6eb;
+    --muted: #9aa1b4;
+    --accent: #4f8cff;
+    --high: #ff5c5c;
+    --medium: #ffb454;
+    --info: #4f8cff;
+    --ok: #4ade80;
+  }
+  @media print {
+    body { background: white; color: black; }
+    .panel { border: 1px solid #ccc; background: white; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 40px;
+    line-height: 1.5;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 26px; margin: 0 0 4px 0; }
+  .subtitle { color: var(--muted); font-size: 14px; }
+  .meta { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .meta div { font-size: 13px; color: var(--muted); }
+  .meta strong { color: var(--text); display: block; font-size: 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  .panel h2 { font-size: 16px; margin: 0 0 16px 0; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .summary-grid .stat { text-align: center; }
+  .summary-grid .stat .num { font-size: 28px; font-weight: 700; }
+  .summary-grid .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.high { background: rgba(255,92,92,.15); color: var(--high); }
+  .badge.medium { background: rgba(255,180,84,.15); color: var(--medium); }
+  .badge.info { background: rgba(79,140,255,.15); color: var(--info); }
+  .badge.open { background: rgba(74,222,128,.15); color: var(--ok); }
+  .host-block { margin-bottom: 20px; }
+  .host-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .host-title .ip { color: var(--accent); }
+  .no-findings { color: var(--muted); font-style: italic; font-size: 14px; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 32px; text-align: center; }
+
+  .gauge-row { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+  .gauge-label { width: 150px; font-size: 13px; flex-shrink: 0; }
+  .gauge-label .ip { display: block; color: var(--text); font-weight: 600; }
+  .gauge-label .grade { display: block; color: var(--muted); font-size: 11px; }
+  .gauge-track { flex: 1; height: 10px; background: #262b3a; border-radius: 999px; overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 999px; }
+  .gauge-score { width: 40px; text-align: right; font-size: 13px; font-weight: 700; }
+  .global-gauge { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+  .global-gauge .big-num { font-size: 42px; font-weight: 800; }
+  .cve-tag { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border-radius: 6px; font-size: 11px; background: rgba(255,92,92,.12); color: var(--high); border: 1px solid rgba(255,92,92,.3); }
+  .cve-tag.medium { background: rgba(255,180,84,.12); color: var(--medium); border-color: rgba(255,180,84,.3); }
+  .cve-tag.low, .cve-tag.info { background: rgba(79,140,255,.12); color: var(--info); border-color: rgba(79,140,255,.3); }
+  .diff-new { color: var(--high); }
+  .diff-closed { color: var(--ok); }
+  .diff-changed { color: var(--medium); }
+  .diff-host { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Rapport d'audit réseau</h1>
+    <div class="subtitle">Cible : {{ scan.target }} — généré le {{ generated_at }}</div>
+    <div class="meta">
+      <div><strong>{{ summary.hosts_up }}</strong>hôtes actifs / {{ summary.hosts_scanned }} scannés</div>
+      <div><strong>{{ summary.total_open_ports }}</strong>ports ouverts</div>
+      <div><strong style="color:#ff5c5c">{{ summary.findings_high }}</strong>alertes critiques</div>
+      <div><strong style="color:#ffb454">{{ summary.findings_medium }}</strong>alertes moyennes</div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Synthèse</h2>
+    <div class="summary-grid">
+      <div class="stat"><div class="num">{{ summary.hosts_up }}</div><div class="label">Hôtes actifs</div></div>
+      <div class="stat"><div class="num">{{ summary.total_open_ports }}</div><div class="label">Ports ouverts</div></div>
+      <div class="stat"><div class="num">{{ summary.findings_high }}</div><div class="label">Risques élevés</div></div>
+      <div class="stat"><div class="num">{{ summary.findings_medium }}</div><div class="label">Risques moyens</div></div>
+    </div>
+  </div>
+
+  {% if diffs %}
+  <div class="panel">
+    <h2>Changements depuis le dernier scan ({{ diffs|length }})</h2>
+    <table>
+      <tr><th>Hôte</th><th>Type</th><th>Détail</th></tr>
+      {% for d in diffs %}
+      <tr>
+        <td>{{ d.host_ip }}</td>
+        <td>
+          {% if d.kind == 'new_port' %}<span class="diff-new">Nouveau port</span>
+          {% elif d.kind == 'closed_port' %}<span class="diff-closed">Port fermé</span>
+          {% elif d.kind == 'service_changed' %}<span class="diff-changed">Service modifié</span>
+          {% elif d.kind == 'new_host' %}<span class="diff-host">Nouvel hôte</span>
+          {% elif d.kind == 'host_down' %}<span class="diff-host">Hôte disparu</span>
+          {% else %}{{ d.kind }}{% endif %}
+        </td>
+        <td>{{ d.detail }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if host_scores %}
+  <div class="panel">
+    <h2>Score de risque</h2>
+    <div class="global-gauge">
+      <div class="big-num" style="color: {% if global_risk_score >= 75 %}var(--high){% elif global_risk_score >= 45 %}var(--medium){% elif global_risk_score > 0 %}var(--accent){% else %}var(--ok){% endif %}">{{ global_risk_score }}</div>
+      <div style="color: var(--muted); font-size: 13px;">Score global sur 100<br>(pondéré : 70% pire hôte, 30% moyenne)</div>
+    </div>
+    {% for s in host_scores %}
+    <div class="gauge-row">
+      <div class="gauge-label"><span class="ip">{{ s.host_ip }}</span><span class="grade">{{ s.grade }}</span></div>
+      <div class="gauge-track">
+        <div class="gauge-fill" style="width: {{ s.score }}%; background: {% if s.score >= 75 %}var(--high){% elif s.score >= 45 %}var(--medium){% elif s.score > 0 %}var(--accent){% else %}var(--ok){% endif %};"></div>
+      </div>
+      <div class="gauge-score">{{ s.score }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <h2>Points d'attention</h2>
+    {% if findings %}
+    <table>
+      <tr><th>Hôte</th><th>Port</th><th>Service</th><th>Sévérité</th><th>Détail</th></tr>
+      {% for f in findings %}
+      <tr>
+        <td>{{ f.host_ip }}</td>
+        <td>{{ f.port }}</td>
+        <td>{{ f.service_label }}</td>
+        <td><span class="badge {{ f.severity }}">{{ f.severity }}</span></td>
+        <td>{{ f.detail }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="no-findings">Aucun service à risque connu détecté sur les ports scannés.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Détail par hôte</h2>
+    {% for host in scan.hosts_up %}
+    <div class="host-block">
+      <div class="host-title"><span class="ip">{{ host.ip }}</span>{% if host.hostname %} — {{ host.hostname }}{% endif %}{% if host.os_guess %} <span style="color:var(--muted); font-weight:400;">({{ host.os_guess }})</span>{% endif %}</div>
+      {% if host.open_ports %}
+      <table>
+        <tr><th>Port</th><th>Protocole</th><th>Service</th><th>Bannière</th><th>CVE connues</th></tr>
+        {% for p in host.open_ports %}
+        {% set port_key = host.ip ~ ':' ~ p.number %}
+        <tr>
+          <td>{{ p.number }}</td>
+          <td>{{ p.protocol }}</td>
+          <td><span class="badge open">{{ p.service or "?" }}</span></td>
+          <td>{{ p.banner }}</td>
+          <td>
+            {% if cves.get(port_key) %}
+              {% for cve in cves[port_key] %}
+              <span class="cve-tag {{ cve.severity|lower }}" title="{{ cve.summary }}">{{ cve.id }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="no-findings">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="no-findings">Aucun port ouvert détecté.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <footer>
+    Généré avec Umbralyn — commande : {{ scan.raw_nmap_args }} — durée : {{ "%.1f"|format(scan.duration_seconds) }}s
+  </footer>
+</div>
+</body>
+</html>

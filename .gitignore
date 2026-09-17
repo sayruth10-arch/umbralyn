@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# umbralyn — secrets et données générées
+config.yaml
+config.local.yaml
+.env.*
+!.env.example
+
+data/
+reports/
+scans/
+
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# macOS
+.DS_Store

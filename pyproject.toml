@@ -15,6 +15,9 @@ dependencies = [
   "weasyprint>=61.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["umbralyn*"]
+
 [project.scripts]
 umbralyn = "umbralyn.__main__:main"
 

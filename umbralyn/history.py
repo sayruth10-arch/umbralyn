@@ -10,7 +10,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .scanner import ScanResult, Host, Port
 
@@ -169,14 +169,20 @@ def load_scan_json(path: str | Path) -> ScanResult:
 def save_scan_json(
     scan: ScanResult,
     path: str | Path,
+    cves: Optional[Dict[str, list]] = None,
 ) -> Path:
-    """Exporte le résultat complet afin de le comparer ou l'archiver."""
+    """Exporte le résultat du scan avec les CVE associées si disponibles."""
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
+    data = scan_to_dict(scan)
+
+    if cves:
+        data["cves"] = cves
+
     output.write_text(
         json.dumps(
-            scan_to_dict(scan),
+            data,
             indent=2,
             ensure_ascii=False,
         ),

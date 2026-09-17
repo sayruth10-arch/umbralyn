@@ -230,6 +230,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
         json_path = save_scan_json(
             scan,
             args.json_out,
+            cves=cves,
         )
 
         print(

@@ -87,7 +87,7 @@ def run_once(
     service_detection: bool = True,
     vuln_scripts: bool = False,
     os_detection: bool = False,
-    timeout: int = 600,
+    timeout_seconds: int = 600,
     email_config: Optional[EmailConfig] = None,
     db_path: Path = DB_PATH,
 ) -> list[DiffEntry]:
@@ -96,10 +96,8 @@ def run_once(
     et envoie une alerte email si des changements sont détectés.
     """
 
-    if timeout <= 0:
-        raise ValueError(
-            "timeout doit être supérieur à 0."
-        )
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds doit être supérieur à 0.")
 
     scan = run_scan(
         target,
@@ -107,7 +105,7 @@ def run_once(
         service_detection=service_detection,
         vuln_scripts=vuln_scripts,
         os_detection=os_detection,
-        timeout=timeout,
+        timeout_seconds=timeout_seconds,
     )
 
     save_scan(
@@ -159,7 +157,7 @@ def run_loop(
     service_detection: bool = True,
     vuln_scripts: bool = False,
     os_detection: bool = False,
-    timeout: int = 600,
+    timeout_seconds: int = 600,
     email_config: Optional[EmailConfig] = None,
     db_path: Path = DB_PATH,
 ) -> None:
@@ -173,9 +171,9 @@ def run_loop(
             "interval_seconds doit être supérieur à 0."
         )
 
-    if timeout <= 0:
+    if timeout_seconds <= 0:
         raise ValueError(
-            "timeout doit être supérieur à 0."
+            "timeout_seconds doit être supérieur à 0."
         )
 
     print(
@@ -192,7 +190,7 @@ def run_loop(
                 service_detection=service_detection,
                 vuln_scripts=vuln_scripts,
                 os_detection=os_detection,
-                timeout=timeout,
+                timeout_seconds=timeout_seconds,
                 email_config=email_config,
                 db_path=db_path,
             )

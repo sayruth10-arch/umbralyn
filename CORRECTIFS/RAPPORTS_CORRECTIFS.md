@@ -10,97 +10,118 @@
 
 Ce document recense les principaux correctifs apportés à UMBRALYN à la suite de l'audit technique du projet.
 
-L'objectif était de vérifier la cohérence du code, la fiabilité des fonctionnalités principales et la qualité des exports avant de poursuivre les tests fonctionnels sur des cibles de laboratoire.
+L'objectif de cette phase était de vérifier la cohérence du code, la fiabilité des fonctionnalités principales, la gestion des erreurs et la cohérence des différents formats d'export avant de poursuivre les validations fonctionnelles sur des environnements de laboratoire contrôlés.
 
 Les corrections ont principalement concerné :
 
 * la recherche de CVE ;
 * la configuration ;
 * l'historisation des scans ;
+* la comparaison des résultats ;
 * le scoring de risque ;
+* l'analyse des risques ;
 * le scheduler ;
-* l'export des résultats ;
+* l'export JSON ;
+* les rapports HTML ;
 * les tests automatisés ;
-* le packaging Python ;
-* la présentation des rapports.
+* le packaging Python.
 
 ---
 
-# 2. Correctifs techniques
+# 2. Recherche CVE — `cve_lookup.py`
 
-## 2.1 Recherche CVE — `cve_lookup.py`
-
-### Problème
+## 2.1 Problème identifié
 
 La fonction de recherche CVE utilisait une variable `api_key` qui n'était pas correctement définie dans son contexte d'utilisation.
 
-### Correction
+Cette situation pouvait provoquer une erreur lors de l'exécution de la recherche CVE.
 
-La récupération de la clé API NVD a été déplacée dans `lookup_cves_for_scan()` :
+## 2.2 Correction
+
+La récupération de la clé API NVD a été déplacée directement dans la fonction `lookup_cves_for_scan()` :
 
 ```python
 api_key = os.environ.get("UMBRALYN_NVD_API_KEY")
 ```
 
-La recherche prend désormais en charge :
+La recherche CVE prend désormais en charge :
 
 * l'API NVD ;
+* une clé API facultative ;
 * une mise en cache locale ;
-* un délai entre les requêtes lorsque aucune clé API n'est utilisée ;
-* un fallback hors ligne lorsque l'API n'est pas disponible.
+* un délai entre les requêtes lorsqu'aucune clé API n'est utilisée ;
+* un fallback hors ligne lorsque l'API NVD n'est pas disponible.
 
-### Amélioration de la documentation
+## 2.3 Clarification du résultat
 
-Les résultats sont désormais présentés comme des **CVE candidates** et non comme des vulnérabilités confirmées.
+La documentation et les rapports utilisent désormais la notion de **CVE candidate**.
 
-Cette distinction est importante : une correspondance produit/version avec une CVE nécessite une vérification complémentaire avant de conclure qu'un système est effectivement vulnérable.
+Une correspondance entre un produit/version détecté et une CVE ne constitue pas automatiquement une preuve que le système est vulnérable.
+
+Le fonctionnement est donc considéré comme :
+
+```text
+Produit / version détecté
+        ↓
+Corrélation avec une CVE
+        ↓
+CVE candidate
+        ↓
+Vérification complémentaire
+        ↓
+Vulnérabilité éventuellement confirmée
+```
+
+Cette distinction permet d'éviter de présenter une corrélation automatisée comme une conclusion définitive.
 
 ---
 
-## 2.2 Historisation et comparaison — `history.py`
+# 3. Historisation et comparaison — `history.py`
 
-### Problème
+## 3.1 Problème identifié
 
-La comparaison des ports utilisait uniquement leur numéro.
+La comparaison des ports entre deux scans utilisait uniquement leur numéro.
 
-Cela pouvait provoquer une confusion entre :
+Cela pouvait provoquer une confusion entre deux services utilisant le même numéro de port mais des protocoles différents :
 
 ```text
 TCP/80
 UDP/80
 ```
 
-### Correction
+## 3.2 Correction
 
-La clé de comparaison utilise désormais :
+La clé utilisée pour comparer les ports prend désormais en compte :
 
 ```python
 (port.number, port.protocol)
 ```
 
-Les changements entre TCP et UDP sont donc correctement différenciés.
+TCP et UDP sont donc correctement différenciés lors des comparaisons.
 
-### Base SQLite
+## 3.3 Base SQLite
 
-Le chemin par défaut a également été harmonisé :
+Le chemin par défaut de la base de données a également été harmonisé :
 
 ```text
 data/umbralyn.db
 ```
 
-La création du répertoire parent est automatique lors de la connexion à la base.
+Le répertoire parent est automatiquement créé lors de la connexion à la base.
+
+Cette modification permet d'éviter les erreurs lorsque le répertoire `data/` n'existe pas encore.
 
 ---
 
-# 3. Configuration — `config.py`
+# 4. Configuration — `config.py`
 
-### Problèmes identifiés
+## 4.1 Problèmes identifiés
 
-Plusieurs valeurs de configuration nécessitaient une validation plus stricte.
+Certaines valeurs de configuration nécessitaient une validation plus stricte afin d'éviter des paramètres incohérents ou invalides.
 
-### Corrections
+## 4.2 Corrections
 
-La configuration valide désormais :
+La configuration valide notamment :
 
 * les valeurs booléennes ;
 * les valeurs entières positives ;
@@ -113,7 +134,9 @@ Le seuil de risque est limité à :
 0 — 100
 ```
 
-Les variables d'environnement `UMBRALYN_*` ont également été intégrées comme priorité sur les valeurs définies dans le fichier YAML.
+Les variables d'environnement `UMBRALYN_*` peuvent également prendre la priorité sur les valeurs définies dans le fichier YAML.
+
+## 4.3 Harmonisation des chemins
 
 Les chemins par défaut ont été harmonisés :
 
@@ -122,11 +145,13 @@ Base de données : data/umbralyn.db
 Rapports        : reports/
 ```
 
+Cette harmonisation permet d'utiliser les mêmes emplacements entre le scanner, l'historisation et le scheduler.
+
 ---
 
-# 4. Scheduler — `scheduler.py`
+# 5. Scheduler — `scheduler.py`
 
-### Problèmes
+## 5.1 Problèmes identifiés
 
 Le scheduler ne partageait pas toujours les mêmes paramètres que le scanner principal.
 
@@ -134,81 +159,110 @@ Des incohérences pouvaient notamment apparaître concernant :
 
 * le timeout ;
 * les options de détection ;
+* les scripts NSE ;
 * la base SQLite.
 
-### Corrections
+## 5.2 Corrections
 
 Le scheduler utilise désormais les mêmes paramètres de scan que la configuration principale.
 
-Le timeout est également validé avant l'exécution.
+Le timeout est validé avant l'exécution du scan.
 
-L'historisation et la comparaison avec le scan précédent sont intégrées au processus planifié.
+L'historisation est également intégrée au processus planifié.
+
+Lorsqu'un historique existe, le nouveau résultat peut être comparé au scan précédent afin d'identifier les changements.
+
+Les alertes email peuvent également être déclenchées lorsque les conditions configurées sont remplies.
 
 ---
 
-# 5. Scoring des risques — `scoring.py`
+# 6. Scoring des risques — `scoring.py`
 
-### Objectif
+## 6.1 Objectif
 
-Rendre le calcul du score plus robuste et plus explicable.
+Le système de scoring a été renforcé afin de rendre le calcul plus robuste et plus explicable.
 
-### Corrections
+Le score UMBRALYN constitue un **indicateur interne** et ne représente pas une norme universelle de sécurité.
+
+## 6.2 Poids des findings
 
 Les poids utilisés sont explicitement définis :
 
 ```text
 Finding :
-    high   = 30
-    medium = 15
-    info   = 5
 
-CVE :
-    critical = 35
-    high     = 25
-    medium   = 12
-    low      = 4
+high   = 30
+medium = 15
+info   = 5
 ```
 
-Le score est limité à :
+## 6.3 Poids des CVE candidates
+
+Les CVE candidates utilisent les pondérations suivantes :
+
+```text
+critical = 35
+high     = 25
+medium   = 12
+low      = 4
+```
+
+## 6.4 Limitation du score
+
+Le score d'un hôte est limité à :
 
 ```text
 100 maximum
 ```
 
-La gestion des données CVE a également été sécurisée afin d'éviter les erreurs lorsque certains champs sont absents.
+Cette limitation évite qu'une accumulation de findings ou de CVE fasse dépasser la plage prévue.
 
-### Méthode du score global
+## 6.5 Gestion des données CVE
 
-Le score global combine :
+La récupération des informations CVE a également été sécurisée afin d'éviter des erreurs lorsque certains champs sont absents ou incomplets.
+
+## 6.6 Calcul du score global
+
+Le score global UMBRALYN combine :
 
 ```text
 70 % : score du pire hôte
 30 % : moyenne des scores des hôtes
 ```
 
-Cette méthode est spécifique à UMBRALYN et constitue un indicateur interne. Elle ne doit pas être considérée comme une norme universelle de mesure de sécurité.
+Cette méthode est spécifique à UMBRALYN.
+
+Elle doit être considérée comme une méthode de synthèse interne permettant de représenter le niveau de risque détecté sur l'ensemble de la cible.
 
 ---
 
-# 6. Analyse des risques — `risk_analysis.py`
+# 7. Analyse des risques — `risk_analysis.py`
 
-### Correction importante
+## 7.1 Clarification des findings
 
-La documentation et les messages générés ont été précisés afin d'éviter de présenter automatiquement un port à risque comme une vulnérabilité.
+La documentation et les messages générés ont été précisés afin d'éviter de présenter automatiquement un port identifié comme risqué comme une vulnérabilité confirmée.
 
-Par exemple :
+La logique distingue désormais clairement :
 
 ```text
-Port exposé ≠ vulnérabilité confirmée
+Port exposé
+≠
+Vulnérabilité confirmée
 ```
 
-Les résultats des scripts NSE nécessitent également une vérification manuelle lorsqu'ils signalent un problème potentiel.
+Un port identifié comme potentiellement risqué représente une exposition ou une surface d'attaque nécessitant éventuellement une analyse complémentaire.
+
+## 7.2 Scripts NSE
+
+Les résultats des scripts Nmap NSE sont également considérés comme des indications techniques.
+
+Lorsqu'un script signale un problème potentiel, une vérification manuelle peut être nécessaire avant de conclure à la présence d'une vulnérabilité.
 
 ---
 
-# 7. Export JSON avec les CVE — `history.py`
+# 8. Export JSON avec les CVE — `history.py`
 
-## Problème identifié
+## 8.1 Problème identifié
 
 Lorsqu'un scan était lancé avec :
 
@@ -216,9 +270,14 @@ Lorsqu'un scan était lancé avec :
 --cve
 ```
 
-les CVE étaient correctement utilisées par le rapport HTML et le scoring, mais **elles n'étaient pas présentes dans l'export JSON**.
+les CVE étaient correctement recherchées et utilisées par :
 
-Le JSON contenait uniquement les informations issues de Nmap :
+* le scoring ;
+* le rapport HTML ;
+
+mais elles n'étaient pas présentes dans l'export JSON.
+
+Le fichier JSON contenait uniquement les informations issues du scan Nmap :
 
 ```text
 target
@@ -228,11 +287,11 @@ services
 versions
 ```
 
-Les résultats CVE étaient stockés séparément dans la variable `cves`.
+Les résultats de corrélation CVE restaient dans la variable `cves` et n'étaient donc pas sauvegardés dans le fichier JSON.
 
-### Correction
+## 8.2 Correction
 
-`save_scan_json()` accepte désormais les résultats CVE :
+La fonction `save_scan_json()` a été modifiée afin d'accepter les CVE en paramètre :
 
 ```python
 def save_scan_json(
@@ -242,30 +301,36 @@ def save_scan_json(
 ) -> Path:
 ```
 
-Les données CVE sont ajoutées au dictionnaire avant la sérialisation :
+Les données du scan sont d'abord sérialisées normalement :
 
 ```python
 data = scan_to_dict(scan)
+```
 
+Puis les CVE sont ajoutées lorsqu'elles sont disponibles :
+
+```python
 if cves:
     data["cves"] = cves
 ```
 
-`__main__.py` transmet désormais les CVE à la fonction :
+## 8.3 Modification de `__main__.py`
+
+Le résultat CVE est désormais transmis à la fonction d'export :
 
 ```python
-save_scan_json(
+json_path = save_scan_json(
     scan,
     args.json_out,
     cves=cves,
 )
 ```
 
-### Validation
+Lorsqu'aucune recherche CVE n'est demandée, la variable reste vide et le fonctionnement normal de l'export est conservé.
 
-Un test d'export a été effectué sans effectuer de nouveau scan réseau.
+## 8.4 Structure obtenue
 
-Le JSON généré contenait correctement :
+Le fichier JSON peut désormais contenir une section dédiée :
 
 ```json
 "cves": {
@@ -279,64 +344,109 @@ Le JSON généré contenait correctement :
 }
 ```
 
-Cette validation confirme que le mécanisme d'export fonctionne.
+Les résultats CVE sont ainsi conservés avec les données du scan.
 
 ---
 
-# 8. Rapports HTML
+# 9. Rapports HTML
 
-### Problème
+## 9.1 Problème identifié
 
-Lorsqu'un scan possédait des CVE mais aucun `Finding`, le rapport pouvait afficher :
+Lorsqu'un scan possédait des CVE candidates mais aucun `Finding`, le rapport pouvait afficher un message laissant penser qu'aucun élément de sécurité n'avait été identifié.
+
+Cela pouvait être ambigu puisque les CVE étaient pourtant présentes dans le rapport.
+
+## 9.2 Correction
+
+Le template :
 
 ```text
-Aucun service à risque connu détecté...
+templates/report.html
 ```
 
-alors que des CVE étaient effectivement présentes plus bas dans le rapport.
+a été adapté afin de différencier plusieurs situations :
 
-### Correction
+### Aucun finding et aucune CVE
 
-Le message a été adapté pour préciser que des CVE peuvent être associées aux services détectés.
+```text
+Aucun service à risque connu ni aucune CVE associée détectée sur les ports scannés.
+```
 
-Le rapport distingue désormais mieux :
+### CVE présentes mais aucun finding
 
-* absence de finding ;
-* présence de CVE candidates ;
-* absence de finding et de CVE.
+```text
+Aucun service à risque connu détecté sur les ports scannés.
+Des CVE associées aux services identifiés sont détaillées ci-dessous.
+```
+
+Le rapport présente ainsi plus clairement la différence entre findings et CVE candidates.
 
 ---
 
-# 9. Tests automatisés
+# 10. Tests automatisés
 
-De nouveaux tests ont été ajoutés pour la configuration.
+## 10.1 Objectif
 
-Les tests vérifient notamment :
+Des tests automatisés ont été ajoutés et renforcés afin de vérifier le comportement des principales fonctionnalités et d'éviter les régressions.
 
-* la configuration par défaut ;
-* les variables d'environnement ;
-* la validation du timeout ;
-* la validation des booléens.
+Les tests couvrent notamment :
 
-Tests réalisés :
-
-```text
-7 tests passés
-0 échec
-```
-
-Les tests existants couvrent également :
-
+* la configuration ;
 * l'historisation ;
 * la comparaison des scans ;
 * la conservation des résultats NSE ;
+* l'export JSON ;
+* l'export des CVE dans le JSON ;
 * le scoring.
+
+## 10.2 Test de l'export CVE
+
+Un test spécifique a été ajouté dans :
+
+```text
+tests/test_history.py
+```
+
+Le test :
+
+```python
+def test_save_scan_json_preserves_cves(tmp_path) -> None:
+```
+
+effectue les opérations suivantes :
+
+1. création d'un scan fictif ;
+2. création d'une CVE de test ;
+3. export du scan au format JSON ;
+4. lecture du fichier JSON généré ;
+5. vérification de la présence et de l'intégrité des données CVE.
+
+Cette vérification confirme que les CVE sont réellement écrites dans le fichier JSON.
+
+## 10.3 Résultat final
+
+La suite de tests complète donne :
+
+```text
+........ [100%]
+
+8 passed in 0.03s
+```
+
+Résultat :
+
+```text
+8 tests passés
+0 échec
+```
+
+Le nouveau test d'export CVE est donc intégré à la suite automatisée.
 
 ---
 
-# 10. Packaging Python
+# 11. Packaging Python
 
-### Problème
+## 11.1 Problème identifié
 
 L'installation du projet avec :
 
@@ -344,11 +454,9 @@ L'installation du projet avec :
 uv pip install -e .
 ```
 
-rencontrait une erreur de découverte de plusieurs packages Python de premier niveau.
+rencontrait initialement une erreur liée à la découverte automatique des packages par Setuptools.
 
-### Cause
-
-Setuptools détectait notamment plusieurs répertoires comme packages potentiels :
+Plusieurs répertoires situés à la racine du projet pouvaient être interprétés comme des packages :
 
 ```text
 web
@@ -357,9 +465,19 @@ templates
 umbralyn
 ```
 
-### Correction
+## 11.2 Cause
 
-Le `pyproject.toml` limite désormais explicitement la découverte au package Python :
+Le projet contient plusieurs répertoires nécessaires au fonctionnement global de l'application, mais seul :
+
+```text
+umbralyn/
+```
+
+correspond au package Python.
+
+## 11.3 Correction
+
+La découverte des packages a été limitée explicitement au package UMBRALYN :
 
 ```toml
 [tool.setuptools.packages.find]
@@ -370,7 +488,7 @@ L'installation editable fonctionne désormais correctement.
 
 ---
 
-# 11. Validation fonctionnelle
+# 12. Validation fonctionnelle
 
 Une validation locale a été réalisée sur macOS avec :
 
@@ -380,13 +498,15 @@ Une validation locale a été réalisée sur macOS avec :
 * dépendances du projet ;
 * pytest.
 
-Fonctionnalités vérifiées :
+Les fonctionnalités suivantes ont été vérifiées :
 
 ```text
 ✓ Lancement du module UMBRALYN
 ✓ Affichage de l'aide CLI
 ✓ Lecture de la configuration
 ✓ Scan Nmap
+✓ Détection des hôtes
+✓ Détection des ports
 ✓ Détection des services
 ✓ Détection des versions
 ✓ Export JSON
@@ -402,15 +522,27 @@ Fonctionnalités vérifiées :
 
 ---
 
-# 12. Validation sur `scanme.nmap.org`
+# 13. Validation sur `scanme.nmap.org`
 
-Une validation sur la cible de test officielle de Nmap a permis de confirmer la détection de services et versions.
-
-Résultat obtenu :
+Une validation fonctionnelle a été réalisée avec la cible de test publique fournie par Nmap :
 
 ```text
-Hôte actif : 45.33.32.156
+scanme.nmap.org
+```
 
+Cette validation a permis de tester la détection des services et des versions sans utiliser le réseau personnel.
+
+## 13.1 Résultat du scan
+
+L'hôte détecté était :
+
+```text
+45.33.32.156
+```
+
+Les services détectés étaient :
+
+```text
 22/tcp
     OpenSSH
     6.6.1p1 Ubuntu 2ubuntu2.13
@@ -420,19 +552,67 @@ Hôte actif : 45.33.32.156
     2.4.7
 ```
 
-UMBRALYN a également identifié une correspondance CVE lors de la recherche NVD :
+## 13.2 Recherche CVE
+
+La recherche CVE a également permis d'identifier une correspondance :
 
 ```text
 CVE-2021-44224
 ```
 
-Cette information est traitée par UMBRALYN comme une **CVE candidate** issue de la corrélation produit/version et ne constitue pas, à elle seule, une preuve de vulnérabilité.
+Cette correspondance est considérée par UMBRALYN comme une **CVE candidate** issue de la corrélation produit/version.
+
+Elle ne constitue pas, à elle seule, une preuve que le système ciblé est effectivement vulnérable.
 
 ---
 
-# 13. État après correction
+# 14. Validation de l'export CVE sans nouveau scan
 
-À l'issue de cette phase :
+Une validation supplémentaire de la correction JSON a été réalisée sans effectuer de nouveau scan Nmap.
+
+Un résultat de scan existant a été réutilisé avec une donnée CVE de test.
+
+Cette méthode a permis de vérifier directement la logique d'export :
+
+```text
+Scan existant
+      ↓
+Ajout d'une CVE de test
+      ↓
+save_scan_json()
+      ↓
+Fichier JSON
+      ↓
+Lecture du fichier
+      ↓
+Vérification de la section "cves"
+```
+
+Cette approche évite de relancer inutilement un scan réseau uniquement pour tester une fonction de sauvegarde.
+
+---
+
+# 15. Historique Git
+
+Les corrections ont été enregistrées dans Git afin de conserver un historique précis des modifications.
+
+Les principaux commits associés à cette phase comprennent notamment :
+
+```text
+3edebc4 Add CVE JSON export test
+```
+
+Ce commit ajoute le test automatisé permettant de vérifier la conservation des CVE dans les exports JSON.
+
+Les corrections précédentes ont également été intégrées et poussées sur le dépôt distant.
+
+Le dernier push effectué pour cette phase a été confirmé avec succès.
+
+---
+
+# 16. État après correction
+
+À l'issue de cette phase, les principales fonctionnalités vérifiées sont :
 
 ```text
 Code principal              ✓
@@ -440,40 +620,62 @@ Configuration               ✓
 Historisation               ✓
 Comparaison                 ✓
 Scoring                     ✓
+Analyse des risques         ✓
 Recherche CVE               ✓
 Rapports HTML               ✓
 Export JSON                 ✓
 Export JSON + CVE           ✓
-NSE                         ✓
+Scripts NSE                 ✓
+Scheduler                   ✓
 Tests automatisés           ✓
-Packaging                   ✓
+Packaging Python            ✓
 ```
 
-Le projet peut désormais poursuivre sa phase de validation sur des environnements de laboratoire contrôlés, notamment avec des machines volontairement vulnérables.
+La suite de tests automatisés présente actuellement :
+
+```text
+8 / 8 tests réussis
+```
 
 ---
 
-# 14. Conclusion
+# 17. Conclusion
 
 Cette phase de correction a permis de renforcer la fiabilité et la cohérence interne d'UMBRALYN.
 
-Les principales améliorations concernent la gestion des CVE, la configuration, l'historisation, le scoring, les rapports et l'export des résultats.
+Les principales améliorations concernent :
 
-Une attention particulière a été portée à la distinction entre :
+* la recherche et la gestion des CVE ;
+* l'historisation des scans ;
+* la comparaison des résultats ;
+* la validation de la configuration ;
+* le scheduler ;
+* le scoring ;
+* l'analyse des risques ;
+* les rapports HTML ;
+* l'export JSON ;
+* l'export des CVE dans les fichiers JSON ;
+* les tests automatisés ;
+* le packaging Python.
+
+Une attention particulière a été portée à la distinction entre les différents niveaux de résultat :
 
 ```text
-détection
+Détection
     ↓
-exposition potentielle
+Exposition potentielle
+    ↓
+Finding / indication technique
     ↓
 CVE candidate
     ↓
-vérification
+Vérification complémentaire
     ↓
-vulnérabilité confirmée
+Vulnérabilité confirmée
 ```
 
-Cette distinction permet d'éviter de présenter les résultats automatisés comme des conclusions définitives.
+Cette distinction permet de conserver une interprétation prudente des résultats automatisés.
 
-La prochaine phase consiste à poursuivre les validations sur un laboratoire contrôlé et à enrichir progressivement la couverture fonctionnelle du projet.
+Avec ces corrections, UMBRALYN dispose d'une base plus cohérente pour poursuivre sa phase de validation sur des environnements de laboratoire contrôlés, notamment avec des machines volontairement vulnérables.
 
+La prochaine étape consiste à continuer les tests fonctionnels et à enrichir progressivement la couverture du projet.
